@@ -1584,6 +1584,7 @@ public class Buffer implements KNIMEStreamConstants {
                 copy.initOutputWriter(new NonClosableOutputStream.Zip(zipOut));
             } catch (UnsupportedOperationException notSupported) {
                 tempFile = DataContainer.createTempFile(copy.m_outputFormat.getFilenameSuffix());
+                copy.m_binFile = tempFile;
                 copy.initOutputWriter(tempFile);
             }
             int count = 1;
