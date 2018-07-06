@@ -99,6 +99,30 @@ public abstract class AbstractWorkflowPortBarEditPart
     }
 
     /**
+     * This attempts to determine the UI bounds from either the hopefully existant (or soon to be, on demand) IFigure
+     * or, as a backup, the underlying WorkflowPortBar model. If both fail, this returns null.
+     *
+     * @return The spatial bounds of this workflow port bar edit part.
+     */
+    public Rectangle getUIBounds() {
+        final IFigure partFigure = getFigure();
+
+        if (partFigure != null) {
+            return partFigure.getBounds();
+        } else {
+            final NodeUIInformation uiInfo = ((WorkflowPortBar)getModel()).getUIInfo();
+
+            if (uiInfo != null) {
+                int[] bounds = uiInfo.getBounds();
+
+                return new Rectangle(bounds[0], bounds[1], bounds[2], bounds[3]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      *
      * {@inheritDoc}
      */
