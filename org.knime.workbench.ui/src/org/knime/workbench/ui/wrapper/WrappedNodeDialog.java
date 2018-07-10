@@ -49,6 +49,7 @@ package org.knime.workbench.ui.wrapper;
 
 import static org.knime.core.ui.wrapper.Wrapper.unwrapNCOptional;
 import static org.knime.core.ui.wrapper.Wrapper.wraps;
+import static org.knime.workbench.ui.async.AsyncSwitch.ncAsyncSwitchRethrow;
 
 import java.awt.Dimension;
 import java.awt.event.InputEvent;
@@ -133,7 +134,9 @@ public class WrappedNodeDialog extends AbstractWrappedDialog {
     public WrappedNodeDialog(final Shell parentShell, final NodeContainerUI nodeContainer) throws NotConfigurableException {
         super(parentShell);
         m_nodeContainer = nodeContainer;
-        m_dialogPane = m_nodeContainer.getDialogPaneWithSettings();
+        m_dialogPane =
+            ncAsyncSwitchRethrow(nc -> nc.getDialogPaneWithSettings(), nc -> nc.getDialogPaneWithSettingsAsync(),
+                nodeContainer, "Waiting for the dialog to open", NotConfigurableException.class);
 
         if (m_nodeContainer.getParent() != null) {
             m_writeProtectionChangedListener = () -> updateWriteProtectedState();

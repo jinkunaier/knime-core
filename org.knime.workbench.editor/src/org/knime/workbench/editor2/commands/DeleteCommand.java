@@ -47,6 +47,10 @@
  */
 package org.knime.workbench.editor2.commands;
 
+import static org.knime.workbench.ui.async.AsyncSwitch.wfmAsyncSwitch;
+import static org.knime.workbench.ui.async.AsyncSwitch.wfmAsyncSwitchVoid;
+
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -54,13 +58,15 @@ import java.util.Set;
 
 import org.eclipse.gef.EditPartViewer;
 import org.knime.core.node.workflow.Annotation;
-import org.knime.core.node.workflow.ConnectionContainer;
+import org.knime.core.node.workflow.ConnectionID;
 import org.knime.core.node.workflow.NodeID;
 import org.knime.core.node.workflow.WorkflowAnnotation;
 import org.knime.core.node.workflow.WorkflowCopyContent;
 import org.knime.core.node.workflow.WorkflowManager;
-import org.knime.core.node.workflow.WorkflowPersistor;
-import org.knime.core.ui.wrapper.Wrapper;
+import org.knime.core.ui.node.workflow.ConnectionContainerUI;
+import org.knime.core.ui.node.workflow.WorkflowCopyUI;
+import org.knime.core.ui.node.workflow.WorkflowManagerUI;
+import org.knime.core.ui.wrapper.WorkflowManagerWrapper;
 import org.knime.workbench.editor2.editparts.AnnotationEditPart;
 import org.knime.workbench.editor2.editparts.ConnectionContainerEditPart;
 import org.knime.workbench.editor2.editparts.NodeContainerEditPart;
@@ -81,7 +87,7 @@ public class DeleteCommand extends AbstractKNIMECommand {
     /** Array containing connections that are to be deleted and which are not
      * part of the persistor (perisistor only covers connections whose source
      * and destination is part of the persistor as well). */
-    private final ConnectionContainer[] m_connections;
+    private final ConnectionContainerUI[] m_connections;
 
     /** Number of connections that will be deleted upon execute(). This includes
      * m_connections and all connections covered by the persistor. This number
@@ -89,12 +95,22 @@ public class DeleteCommand extends AbstractKNIMECommand {
      */
     private final int m_connectionCount;
 
-    /** Persistor of deleted sub flow for undo. */
-    private WorkflowPersistor m_undoPersitor;
+    /** Copy of deleted sub flow for undo. */
+    private WorkflowCopyUI m_undoCopy;
 
     /** A viewer in which to update the selection upon undo or null if none
      * could be determined. */
     private final EditPartViewer m_viewer;
+
+    /**
+     * To work backwards-compatible with {@link WorkflowManager}
+     *
+     * @param editParts
+     * @param manager
+     */
+    public DeleteCommand(final Collection<?> editParts, final WorkflowManager manager) {
+        this(editParts, WorkflowManagerWrapper.wrap(manager));
+    }
 
     /**
      * Creates a new delete command for a set of nodes. Undo will also restore
@@ -103,13 +119,13 @@ public class DeleteCommand extends AbstractKNIMECommand {
      * @param manager wfm hosting the nodes.
      */
     public DeleteCommand(final Collection<?> editParts,
-            final WorkflowManager manager) {
+            final WorkflowManagerUI manager) {
         super(manager);
         Set<NodeID> idSet = new LinkedHashSet<NodeID>();
         Set<WorkflowAnnotation> annotationSet =
             new LinkedHashSet<WorkflowAnnotation>();
-        Set<ConnectionContainer> conSet =
-            new LinkedHashSet<ConnectionContainer>();
+        Set<ConnectionContainerUI> conSet =
+            new LinkedHashSet<ConnectionContainerUI>();
         EditPartViewer viewer = null;
         for (Object p : editParts) {
             if (p instanceof NodeContainerEditPart) {
@@ -136,9 +152,7 @@ public class DeleteCommand extends AbstractKNIMECommand {
             } else if (p instanceof ConnectionContainerEditPart) {
                 ConnectionContainerEditPart ccep =
                     (ConnectionContainerEditPart)p;
-                if (Wrapper.wraps(ccep.getModel(), ConnectionContainer.class)) {
-                    conSet.add(Wrapper.unwrapCC(ccep.getModel()));
-                }
+                conSet.add(ccep.getModel());
                 if (viewer == null && ccep.getParent() != null) {
                     viewer = ccep.getViewer();
                 }
@@ -161,15 +175,15 @@ public class DeleteCommand extends AbstractKNIMECommand {
 
         m_connectionCount = conSet.size();
         // remove all connections that will be contained in the persistor
-        for (Iterator<ConnectionContainer> it = conSet.iterator();
+        for (Iterator<ConnectionContainerUI> it = conSet.iterator();
         it.hasNext();) {
-            ConnectionContainer c = it.next();
+            ConnectionContainerUI c = it.next();
             if (idSet.contains(c.getSource()) && idSet.contains(c.getDest())) {
                 it.remove();
             }
         }
 
-        m_connections = conSet.toArray(new ConnectionContainer[conSet.size()]);
+        m_connections = conSet.toArray(new ConnectionContainerUI[conSet.size()]);
     }
 
     /** {@inheritDoc} */
@@ -179,16 +193,16 @@ public class DeleteCommand extends AbstractKNIMECommand {
             return false;
         }
         boolean foundValid = false;
-        WorkflowManager hostWFM = getHostWFM();
+        WorkflowManagerUI hostWFM = getHostWFMUI();
         for (NodeID id : m_nodeIDs) {
             foundValid = true;
             if (!hostWFM.canRemoveNode(id)) {
                 return false;
             }
         }
-        for (ConnectionContainer cc : m_connections) {
+        for (ConnectionContainerUI cc : m_connections) {
             foundValid = true;
-            if (!hostWFM.canRemoveConnection(cc)) {
+            if (!hostWFM.canRemoveConnection(cc.getID())) {
                 return false;
             }
         }
@@ -198,24 +212,20 @@ public class DeleteCommand extends AbstractKNIMECommand {
     /** {@inheritDoc} */
     @Override
     public void execute() {
-        WorkflowManager hostWFM = getHostWFM();
+        WorkflowManagerUI hostWFM = getHostWFMUI();
         // The WFM removes all connections for us, before the node is
         // removed.
         if (m_nodeIDs.length > 0 || m_annotations.length > 0) {
             WorkflowCopyContent.Builder content = WorkflowCopyContent.builder();
             content.setNodeIDs(m_nodeIDs);
             content.setAnnotation(m_annotations);
-            m_undoPersitor = hostWFM.copy(true, content.build());
+            m_undoCopy = wfmAsyncSwitch(wfm -> wfm.copy(true, content.build()), wfm -> null, hostWFM,
+                "Copying content for undo ...");
         }
-        for (WorkflowAnnotation anno : m_annotations) {
-            hostWFM.removeAnnotation(anno);
-        }
-        for (NodeID id : m_nodeIDs) {
-            hostWFM.removeNode(id);
-        }
-        for (ConnectionContainer cc : m_connections) {
-            hostWFM.removeConnection(cc);
-        }
+        ConnectionID[] connectionIDs =
+            Arrays.stream(m_connections).map(cc -> cc.getID()).toArray(size -> new ConnectionID[size]);
+        wfmAsyncSwitchVoid(wfm -> wfm.remove(m_nodeIDs, connectionIDs),
+            wfm -> wfm.removeAsync(m_nodeIDs, connectionIDs), hostWFM, "Deleting worklfow parts ...");
     }
 
     /** {@inheritDoc} */
@@ -229,12 +239,12 @@ public class DeleteCommand extends AbstractKNIMECommand {
             m_viewer.deselectAll();
         }
 
-        WorkflowManager hostWFM = getHostWFM();
-        if (m_undoPersitor != null) {
-            hostWFM.paste(m_undoPersitor);
+        WorkflowManagerUI hostWFM = getHostWFMUI();
+        if (m_undoCopy != null) {
+            hostWFM.paste(m_undoCopy);
         }
-        for (ConnectionContainer cc : m_connections) {
-            ConnectionContainer newCC = hostWFM.addConnection(cc.getSource(),
+        for (ConnectionContainerUI cc : m_connections) {
+            ConnectionContainerUI newCC = hostWFM.addConnection(cc.getSource(),
                     cc.getSourcePort(), cc.getDest(), cc.getDestPort());
             newCC.setUIInfo(cc.getUIInfo());
         }
@@ -243,7 +253,7 @@ public class DeleteCommand extends AbstractKNIMECommand {
     /** {@inheritDoc} */
     @Override
     public void dispose() {
-        m_undoPersitor = null;
+        m_undoCopy = null;
         super.dispose();
     }
 

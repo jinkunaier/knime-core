@@ -56,6 +56,7 @@ import org.knime.core.node.workflow.ConnectionContainer;
 import org.knime.core.node.workflow.NodeContainer;
 import org.knime.core.node.workflow.WorkflowManager;
 import org.knime.core.ui.UI;
+import org.knime.core.ui.node.workflow.ConnectionContainerUI;
 
 import com.google.common.collect.MapMaker;
 
@@ -218,6 +219,25 @@ public interface Wrapper<W> {
             return wrappedObjectClass.isAssignableFrom(cast.unwrap().getClass());
         } else {
             return false;
+        }
+    }
+
+    /**
+     * Casts the passed object to {@link ConnectionContainer} or {@link ConnectionContainerUI}. If it's a
+     * {@link ConnectionContainer} it will then be wrapped into a {@link ConnectionContainerWrapper}
+     *
+     * @param cc the object to cast and possibly wrap
+     * @return a cast and possibly wrapped {@link ConnectionContainerUI}
+     * @throws ClassCastException if the object is not of type {@link ConnectionContainerUI} nor
+     *             {@link ConnectionContainer}
+     */
+    public static ConnectionContainerUI castAndWrapCC(final Object cc) {
+        if (cc instanceof ConnectionContainerUI) {
+            return (ConnectionContainerUI)cc;
+        } else if (cc instanceof ConnectionContainer) {
+            return ConnectionContainerWrapper.wrap((ConnectionContainer)cc);
+        } else {
+            throw new ClassCastException("Not a connection container.");
         }
     }
 

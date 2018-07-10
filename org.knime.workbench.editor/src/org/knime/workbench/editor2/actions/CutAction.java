@@ -146,7 +146,7 @@ public class CutAction extends AbstractClipboardAction {
         coll.addAll(Arrays.asList(annotationParts));
 
         DeleteCommand delete = new DeleteCommand(
-                coll, getEditor().getWorkflowManager().get());
+                coll, getEditor().getWorkflowManagerUI());
         getCommandStack().execute(delete); // enable undo
 
         getEditor().updateActions();

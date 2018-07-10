@@ -47,6 +47,8 @@
  */
 package org.knime.workbench.editor2.editparts;
 
+import static org.knime.core.ui.wrapper.Wrapper.castAndWrapCC;
+
 import java.util.LinkedList;
 import java.util.List;
 
@@ -63,7 +65,6 @@ import org.eclipse.gef.requests.SelectionRequest;
 import org.eclipse.gef.tools.ConnectionDragCreationTool;
 import org.eclipse.swt.widgets.Display;
 import org.knime.core.node.port.PortType;
-import org.knime.core.node.workflow.ConnectionContainer;
 import org.knime.core.node.workflow.NodeID;
 import org.knime.core.node.workflow.WorkflowEvent;
 import org.knime.core.node.workflow.WorkflowListener;
@@ -305,14 +306,14 @@ public abstract class AbstractPortEditPart extends AbstractGraphicalEditPart
                     if (!isActive()) {
                         return;
                     }
-                    ConnectionContainer c = null;
+                    ConnectionContainerUI c = null;
 
                     if (event.getType().equals(
                             WorkflowEvent.Type.CONNECTION_ADDED)) {
-                        c = (ConnectionContainer)event.getNewValue();
+                        c = castAndWrapCC(event.getNewValue());
                     } else if (event.getType().equals(
                             WorkflowEvent.Type.CONNECTION_REMOVED)) {
-                        c = (ConnectionContainer)event.getOldValue();
+                        c = castAndWrapCC(event.getOldValue());
                     }
 
                     // if we have a connection to refresh...

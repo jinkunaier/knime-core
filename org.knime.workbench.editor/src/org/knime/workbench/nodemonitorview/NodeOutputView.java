@@ -47,6 +47,8 @@
  */
 package org.knime.workbench.nodemonitorview;
 
+import static org.knime.core.ui.wrapper.Wrapper.castAndWrapCC;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -96,7 +98,6 @@ import org.knime.core.node.config.base.ConfigBase;
 import org.knime.core.node.config.base.ConfigEntries;
 import org.knime.core.node.port.PortObject;
 import org.knime.core.node.tableview.TableView;
-import org.knime.core.node.workflow.ConnectionContainer;
 import org.knime.core.node.workflow.FlowObjectStack;
 import org.knime.core.node.workflow.FlowVariable;
 import org.knime.core.node.workflow.NativeNodeContainer;
@@ -111,6 +112,7 @@ import org.knime.core.node.workflow.WorkflowEvent;
 import org.knime.core.node.workflow.WorkflowEvent.Type;
 import org.knime.core.node.workflow.WorkflowListener;
 import org.knime.core.node.workflow.WorkflowManager;
+import org.knime.core.ui.node.workflow.ConnectionContainerUI;
 import org.knime.core.ui.wrapper.Wrapper;
 import org.knime.core.util.Pair;
 import org.knime.workbench.editor2.editparts.NodeContainerEditPart;
@@ -840,7 +842,7 @@ public class NodeOutputView extends ViewPart implements ISelectionListener, Loca
         }
         Type type = event.getType();
         if (type == Type.CONNECTION_ADDED) {
-            ConnectionContainer cc = (ConnectionContainer)event.getNewValue();
+            ConnectionContainerUI cc = castAndWrapCC(event.getNewValue());
             if (cc.getSource().equals(m_lastNode)) {
                 if (m_workflow.getOutgoingConnectionsFor(m_lastNode).size() == 1) {
                     if (m_workflow.containsNodeContainer(cc.getDest())) { // could be an outgoing metanode connection
@@ -850,7 +852,7 @@ public class NodeOutputView extends ViewPart implements ISelectionListener, Loca
                 }
             }
         } else if (type == Type.CONNECTION_REMOVED) {
-            ConnectionContainer cc = (ConnectionContainer)event.getOldValue();
+            ConnectionContainerUI cc = castAndWrapCC(event.getOldValue());
             if (cc.getDest().equals(m_lastNode)) {
                 if (m_workflow.containsNodeContainer(m_lastNode)) {
                     if (m_workflow.getOutgoingConnectionsFor(m_lastNode).size() == 0) {

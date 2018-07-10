@@ -3200,7 +3200,8 @@ public class WorkflowEditor extends GraphicalEditor implements
         //only can be marked dirty if not write protected
         if (!m_manager.isWriteProtected()) {
             m_manager.setDirty(); // call anyway to allow auto-save copy to be dirty (the WFM has 2 dirty flags, really)
-            if (!m_isDirty) {
+            //some WM-implementations won't allow to be set dirty -> i.e. check whether dirty
+            if (!m_isDirty && m_manager.isDirty()) {
                 m_isDirty = true;
 
                 SyncExecQueueDispatcher.asyncExec(new Runnable() {

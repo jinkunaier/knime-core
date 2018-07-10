@@ -69,10 +69,12 @@ import org.knime.core.node.workflow.NodeUIInformation;
 import org.knime.core.node.workflow.NodeUIInformationEvent;
 import org.knime.core.node.workflow.WorkflowAnnotation;
 import org.knime.core.node.workflow.WorkflowContext;
+import org.knime.core.node.workflow.WorkflowCopyContent;
 import org.knime.core.node.workflow.WorkflowListener;
 import org.knime.core.node.workflow.WorkflowManager;
 import org.knime.core.ui.node.workflow.ConnectionContainerUI;
 import org.knime.core.ui.node.workflow.NodeContainerUI;
+import org.knime.core.ui.node.workflow.WorkflowCopyUI;
 import org.knime.core.ui.node.workflow.WorkflowInPortUI;
 import org.knime.core.ui.node.workflow.WorkflowManagerUI;
 import org.knime.core.ui.node.workflow.WorkflowOutPortUI;
@@ -115,6 +117,19 @@ public final class WorkflowManagerWrapper extends NodeContainerWrapper<WorkflowM
     }
 
     @Override
+    public void remove(final NodeID[] nodeIDs, final ConnectionID[] connections) {
+        for (NodeID id : nodeIDs) {
+            unwrap().removeNode(id);
+        }
+        for (ConnectionID id : connections) {
+            unwrap().removeConnection(unwrap().getConnection(id));
+        }
+//        for (WorkflowAnnotation wa : annotations) {
+//            unwrap().removeAnnotation(wa);
+//        }
+    }
+
+    @Override
     public boolean isProject() {
         return unwrap().isProject();
     }
@@ -127,6 +142,17 @@ public final class WorkflowManagerWrapper extends NodeContainerWrapper<WorkflowM
     @Override
     public boolean canAddNewConnection(final NodeID source, final int sourcePort, final NodeID dest, final int destPort) {
         return unwrap().canAddNewConnection(source, sourcePort, dest, destPort);
+    }
+
+    @Override
+    public boolean canRemoveConnection(final ConnectionID connectionID) {
+        return unwrap().canRemoveConnection(unwrap().getConnection(connectionID));
+    }
+
+    @Override
+    public ConnectionContainerUI addConnection(final NodeID source, final int sourcePort, final NodeID dest,
+        final int destPort) {
+        return ConnectionContainerWrapper.wrap(unwrap().addConnection(source, sourcePort, dest, destPort));
     }
 
     @Override
@@ -273,6 +299,11 @@ public final class WorkflowManagerWrapper extends NodeContainerWrapper<WorkflowM
     }
 
     @Override
+    public boolean containsNodeContainer(final NodeID id) {
+        return unwrap().containsNodeContainer(id);
+    }
+
+    @Override
     public <T> T getNodeContainer(final NodeID id, final Class<T> subclass, final boolean failOnError) {
         return unwrap().getNodeContainer(id, subclass, failOnError);
     }
@@ -331,6 +362,37 @@ public final class WorkflowManagerWrapper extends NodeContainerWrapper<WorkflowM
     @Override
     public void removeListener(final WorkflowListener listener) {
         unwrap().removeListener(listener);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WorkflowCopyUI copy(final WorkflowCopyContent content) {
+        return WorkflowPersistorWrapper.wrap(unwrap().copy(content));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WorkflowCopyUI copy(final boolean isUndoableDeleteCommand, final WorkflowCopyContent content) {
+        return WorkflowPersistorWrapper.wrap(unwrap().copy(isUndoableDeleteCommand, content));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws IllegalArgumentException if the workflow copy is not of type {@link WorkflowPersistorWrapper}
+     */
+    @Override
+    public WorkflowCopyContent paste(final WorkflowCopyUI workflowCopy) {
+        if (workflowCopy instanceof WorkflowPersistorWrapper) {
+            return unwrap().paste(((WorkflowPersistorWrapper)workflowCopy).unwrap());
+        } else {
+            throw new IllegalArgumentException(
+                "Only worklfow copies of type '" + WorkflowPersistorWrapper.class.getSimpleName() + "' allowed.");
+        }
     }
 
     @Override
